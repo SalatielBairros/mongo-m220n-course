@@ -1,4 +1,4 @@
-﻿    using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,7 +17,7 @@ namespace M220N.Repositories
 
         public UsersRepository(IMongoClient mongoClient)
         {
-            var camelCaseConvention = new ConventionPack {new CamelCaseElementNameConvention()};
+            var camelCaseConvention = new ConventionPack { new CamelCaseElementNameConvention() };
             ConventionRegistry.Register("CamelCase", camelCaseConvention, type => true);
 
             _usersCollection = mongoClient.GetDatabase("sample_mflix").GetCollection<User>("users");
@@ -53,8 +53,7 @@ namespace M220N.Repositories
             // TODO Ticket: User Management
             // Retrieve the user document corresponding with the user's email.
             //
-            // // return await _usersCollection.Find(...)
-            return null;
+            return await _usersCollection.Find(x => x.Email == email).FirstOrDefaultAsync();
         }
 
         /// <summary>
@@ -70,7 +69,14 @@ namespace M220N.Repositories
         {
             try
             {
-                var user = new User();
+                var user = new User
+                {
+                    Email = email,
+                    HashedPassword = PasswordHashOMatic.Hash(password),
+                    Name = name
+                };
+                await _usersCollection.WithWriteConcern(WriteConcern.WMajority).InsertOneAsync(user);
+
                 // TODO Ticket: User Management
                 // Create a user with the "Name", "Email", and "HashedPassword" fields.
                 // DO NOT STORE CLEAR-TEXT PASSWORDS! Instead, use the helper class
@@ -132,6 +138,14 @@ namespace M220N.Repositories
                 //  Builders<Session>.Update.Set(...).Set(...),
                 //  new UpdateOptions(...));
 
+                var filter = Builders<Session>.Filter.Eq(x => x.UserId, user.Email);
+                var update = Builders<Session>.Update.Set(x => x.UserId, user.Email).Set(x => x.Jwt, user.AuthToken);
+                var options = new UpdateOptions
+                {
+                    IsUpsert = true
+                };
+
+                await _sessionsCollection.UpdateOneAsync(filter, update, options);
                 storedUser.AuthToken = user.AuthToken;
                 return new UserResponse(storedUser);
             }
@@ -152,8 +166,10 @@ namespace M220N.Repositories
         {
             // TODO Ticket: User Management
             // Delete the document in the `sessions` collection matching the email.
-            
-            await _sessionsCollection.DeleteOneAsync(new BsonDocument(), cancellationToken);
+
+            var filter = Builders<Session>.Filter.Eq(x => x.UserId, email);
+
+            await _sessionsCollection.DeleteOneAsync(filter, cancellationToken);
             return new UserResponse(true, "User logged out.");
         }
 
@@ -167,7 +183,8 @@ namespace M220N.Repositories
         {
             // TODO Ticket: User Management
             // Retrieve the session document corresponding with the user's email.
-            return await _sessionsCollection.Find(new BsonDocument()).FirstOrDefaultAsync();
+            var filter = Builders<Session>.Filter.Eq(x => x.UserId, email);
+            return await _sessionsCollection.Find(filter).FirstOrDefaultAsync();
         }
 
         /// <summary>
@@ -217,17 +234,21 @@ namespace M220N.Repositories
                   reflect the new information in preferences.
                 */
 
+                var filter = Builders<User>.Filter.Eq(x => x.Email, email);
+                var options = new UpdateOptions
+                {
+                    IsUpsert = false
+                };
+
                 UpdateResult updateResult = null;
                 // TODO Ticket: User Preferences
                 // Use the data in "preferences" to update the user's preferences.
                 //
-                // updateResult = await _usersCollection.UpdateOneAsync(
-                //    new BsonDocument(),
-                //    Builders<User>.Update.Set("TODO", preferences),
-                //    /* Be sure to pass a new UpdateOptions object here,
-                //       setting IsUpsert to false! */
-                //    new UpdateOptions(),
-                //    cancellationToken);
+                updateResult = await _usersCollection.UpdateOneAsync(
+                   filter,
+                   Builders<User>.Update.Set(x => x.Preferences, preferences),
+                   options,
+                   cancellationToken);
 
                 return updateResult.MatchedCount == 0
                     ? new UserResponse(false, "No user found with that email")
