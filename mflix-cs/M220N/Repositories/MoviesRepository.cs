@@ -207,7 +207,16 @@ namespace M220N.Repositories
             // include pagination. Refer to the other methods in this class
             // if you need a hint.
 
-            return returnValue;
+            var filter = Builders<Movie>
+                .Filter
+                .AnyIn(x => x.Genres, genres);
+
+            return await _moviesCollection
+                .Find(filter)
+                .Limit(limit)
+                .Skip(page * limit)
+                .Sort(sort)
+                .ToListAsync(cancellationToken);
         }
 
         /// <summary>
@@ -253,6 +262,9 @@ namespace M220N.Repositories
             {
                 matchStage,
                 sortStage,
+                skipStage,
+                limitStage,
+                facetStage
                 // add the remaining stages in the correct order
 
             };
