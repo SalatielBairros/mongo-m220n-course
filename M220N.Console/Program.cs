@@ -10,11 +10,15 @@ namespace M220N.Console
 {
     public class Program
     {
-        private static MongoConnection _mongoConnection;
+        private static MovieService _service;
 
         public static void Main(string[] args)
         {
-            using IHost host = CreateHostBuilder(args).Build();            
+            using IHost host = CreateHostBuilder(args).Build();
+            //var movie = _service.Get(new { title = "The Princess Bride" });
+            var movie = _service.Get10thLongestMovie();
+            System.Console.WriteLine(movie["title"]);
+            host.Run();
         }
 
         private static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -25,8 +29,8 @@ namespace M220N.Console
                    configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
                    var configurationRoot = configuration.Build();
-                   var conn = configurationRoot.GetValue<string>("MongoConnection:ConnectionString");         
-                   _mongoConnection = new MongoConnection(conn);
+                   var conn = configurationRoot.GetValue<string>("MongoConnection:ConnectionString");
+                   _service = new MovieService(new MongoRepository(conn));
                });
     }
 }
