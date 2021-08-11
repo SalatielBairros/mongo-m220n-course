@@ -35,9 +35,14 @@ namespace Migrator
                 // datePipelineResults. You will need to use a ReplaceOneModel<Movie>
                 // (https://mongodb.github.io/mongo-csharp-driver/2.12/apidocs/html/T_MongoDB_Driver_ReplaceOneModel_1.htm).
                 //
-                // // bulkWriteDatesResult = await _moviesCollection.BulkWriteAsync(...
 
-                Console.WriteLine($"{bulkWriteDatesResult.ProcessedRequests.Count} records updated.");
+                var replaces = datePipelineResults
+                    .Select(x => new ReplaceOneModel<Movie>(Builders<Movie>.Filter.Eq(y => y.Id, x.Id), x))
+                    .ToList();
+                bulkWriteDatesResult = await _moviesCollection.BulkWriteAsync(replaces);
+
+
+               Console.WriteLine($"{bulkWriteDatesResult.ProcessedRequests.Count} records updated.");
             }
 
             var ratingPipelineResults = TransformRatingPipeline();
@@ -50,9 +55,11 @@ namespace Migrator
                 // ratingPipelineResults. You will need to use a ReplaceOneModel<Movie>
                 // (https://mongodb.github.io/mongo-csharp-driver/2.12/apidocs/html/T_MongoDB_Driver_ReplaceOneModel_1.htm).
                 //
-                // // bulkWriteRatingsResult = await _moviesCollection.BulkWriteAsync(...
-
-                Console.WriteLine($"{bulkWriteRatingsResult.ProcessedRequests.Count} records updated.");
+                var replaces = ratingPipelineResults
+                    .Select(x => new ReplaceOneModel<Movie>(Builders<Movie>.Filter.Eq(y => y.Id, x.Id), x))
+                    .ToList();
+                bulkWriteRatingsResult = await _moviesCollection.BulkWriteAsync(replaces);
+               Console.WriteLine($"{bulkWriteRatingsResult.ProcessedRequests.Count} records updated.");
             }
 
             Console.WriteLine();

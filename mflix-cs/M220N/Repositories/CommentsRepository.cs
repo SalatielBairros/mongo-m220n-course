@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using M220N.Models;
@@ -51,6 +52,7 @@ namespace M220N.Repositories
                 // Implement InsertOneAsync() to insert a
                 // new comment into the comments collection.
 
+                await _commentsCollection.InsertOneAsync(newComment);
                 return await _moviesRepository.GetMovieAsync(movieId.ToString(), cancellationToken);
             }
             catch
@@ -83,7 +85,14 @@ namespace M220N.Repositories
             // // new UpdateOptions { ... } ,
             // // cancellationToken);
 
-            return null;
+            var filter = Builders<Comment>.Filter.Where(x => x.Email == user.Email && x.MovieId == movieId && x.Id == commentId);
+            var update = Builders<Comment>.Update.Set(x => x.Text, comment);
+            var options = new UpdateOptions
+            {
+                IsUpsert = false
+            };
+
+            return await _commentsCollection.UpdateOneAsync(filter, update, options, cancellationToken);
         }
 
         /// <summary>
@@ -104,7 +113,7 @@ namespace M220N.Repositories
             _commentsCollection.DeleteOne(
                 Builders<Comment>.Filter.Where(
                     c => c.MovieId == movieId
-                         && c.Id == commentId));
+                         && c.Id == commentId && c.Email == user.Email));
 
             return await _moviesRepository.GetMovieAsync(movieId.ToString(), cancellationToken);
         }
@@ -127,11 +136,17 @@ namespace M220N.Repositories
                 // Return the 20 users who have commented the most on MFlix. You will need to use
                 // the Group, Sort, Limit, and Project methods of the Aggregation pipeline.
                 //
-                // // result = await _commentsCollection
-                // //   .WithReadConcern(...)
-                // //   .Aggregate()
-                // //   .Group(...)
-                // //   .Sort(...).Limt(...).Project(...).ToListAsync()
+                result = await _commentsCollection
+                  .WithReadConcern(ReadConcern.Majority)
+                  .Aggregate()
+                  .Group(x => x.Email, y => new ReportProjection
+                  {
+                      Id = y.Key,
+                      Count = y.Count()
+                  })
+                  .SortByDescending(x => x.Count)
+                  .Limit(20)
+                  .ToListAsync();
 
                 return new TopCommentsProjection(result);
             }

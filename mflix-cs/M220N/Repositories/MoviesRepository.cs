@@ -86,12 +86,18 @@ namespace M220N.Repositories
             {
                 return await _moviesCollection.Aggregate()
                     .Match(Builders<Movie>.Filter.Eq(x => x.Id, movieId))
+                    .Lookup(
+                        _commentsCollection,
+                        m => m.Id,
+                        c => c.MovieId,
+                        (Movie m) => m.Comments
+                        )
                     // Ticket: Get Comments
                     // Add a lookup stage that includes the
                     // comments associated with the retrieved movie
                     .FirstOrDefaultAsync(cancellationToken);
             }
-
+            catch (FormatException) { return null; }
             catch (Exception ex)
             {
                 // TODO Ticket: Error Handling
@@ -116,9 +122,9 @@ namespace M220N.Repositories
         {
             var filter = Builders<Movie>
                 .Filter
-                .AnyIn(x => x.Countries, countries);                
+                .AnyIn(x => x.Countries, countries);
 
-            return await _moviesCollection                    
+            return await _moviesCollection
                .Find(filter)
                .SortByDescending(m => m.Title)
                .Project(x => new MovieByCountryProjection
